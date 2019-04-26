@@ -26,8 +26,8 @@ def dataloader(num_batches,
     :param num_batches: Total number of batches to generate.
     :param seq_width: The width of each item in the sequence.
     :param batch_size: Batch size.
-    :param min_len: Sequence minimum length.
-    :param max_len: Sequence maximum length.
+    :param min_len: Sequence minimum length per batches.
+    :param max_len: Sequence maximum length per batches.
 
     NOTE: The input width is `seq_width + 1`, the additional input
     contain the delimiter.
@@ -36,6 +36,7 @@ def dataloader(num_batches,
 
         # All batches have the same sequence length
         seq_len = random.randint(min_len, max_len)
+        # 每个位置，随机决定置0或1
         seq = np.random.binomial(1, 0.5, (seq_len, batch_size, seq_width))
         seq = torch.from_numpy(seq)
 
@@ -43,6 +44,7 @@ def dataloader(num_batches,
         inp = torch.zeros(seq_len + 1, batch_size, seq_width + 1)
         inp[:seq_len, :, :seq_width] = seq
         inp[seq_len, :, seq_width] = 1.0 # delimiter in our control channel
+        # 最后一个序列中全是类似：[0., 0., 0., 0., 0., 1.]
         outp = seq.clone()
 
         yield batch_num+1, inp.float(), outp.float()
@@ -57,8 +59,8 @@ class CopyTaskParams(object):
     sequence_width = attrib(default=8, convert=int)
     sequence_min_len = attrib(default=1,convert=int)
     sequence_max_len = attrib(default=20, convert=int)
-    memory_n = attrib(default=128, convert=int)
-    memory_m = attrib(default=20, convert=int)
+    memory_n = attrib(default=128, convert=int)  # memory数目
+    memory_m = attrib(default=20, convert=int)  # 单个memory维度
     num_batches = attrib(default=50000, convert=int)
     batch_size = attrib(default=1, convert=int)
     rmsprop_lr = attrib(default=1e-4, convert=float)
@@ -115,3 +117,8 @@ class CopyTaskModelTraining(object):
                              momentum=self.params.rmsprop_momentum,
                              alpha=self.params.rmsprop_alpha,
                              lr=self.params.rmsprop_lr)
+
+
+if __name__ == "__main__":
+    for _ in dataloader(num_batches=2, batch_size=3, seq_width=5, min_len=1, max_len=5):
+        print(_[1].shape, _[1][-1])

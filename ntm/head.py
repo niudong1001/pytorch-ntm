@@ -8,7 +8,11 @@ import numpy as np
 def _split_cols(mat, lengths):
     """Split a 2D matrix to variable length columns."""
     assert mat.size()[1] == sum(lengths), "Lengths must be summed to num columns"
+    # np.cumsum是在某个轴上累加
+    # 参考：https://blog.csdn.net/banana1006034246/article/details/78841461
+    # print(lengths)  # [20, 1, 1, 3, 1, 20, 20]
     l = np.cumsum([0] + lengths)
+    # print(l)  # [ 0 20 21 22 25 26 46 66]
     results = []
     for s, e in zip(l[:-1], l[1:]):
         results += [mat[:, s:e]]
@@ -26,7 +30,7 @@ class NTMHeadBase(nn.Module):
         """
         super(NTMHeadBase, self).__init__()
 
-        self.memory = memory
+        self.memory = memory # memory对象
         self.N, self.M = memory.size()
         self.controller_size = controller_size
 
@@ -41,10 +45,15 @@ class NTMHeadBase(nn.Module):
 
     def _address_memory(self, k, β, g, s, γ, w_prev):
         # Handle Activations
+        # 相当于对于LSTM的输出做一个再处理
         k = k.clone()
+        # softplus是平滑版本的relu，
+        # 参考：https://blog.csdn.net/bqw18744018044/article/details/81193241
         β = F.softplus(β)
         g = F.sigmoid(g)
+        # 这里直接采用了softmax，而不是论文中的另一种方法
         s = F.softmax(s, dim=1)
+        # 保证sharpen值不小于1
         γ = 1 + F.softplus(γ)
 
         w = self.memory.address(k, β, g, s, γ, w_prev)
@@ -57,7 +66,15 @@ class NTMReadHead(NTMHeadBase):
         super(NTMReadHead, self).__init__(memory, controller_size)
 
         # Corresponding to k, β, g, s, γ sizes from the paper
+        # k：头产生的key向量，其会跟Memory中每条记忆进行相似性比较，并计算权重向量
+        # β：头产生的key强度值常数，会在根据k相似性产生权重向量的时候，增加每一项的参与强度，Paper(8)
+        # g：一个插值门常数，值范围[0,1]，根据其计算出新的权值 w_{t,g} <= g * w_{t, c} + (1-g) * w_{t-1}，其中w_{t, c}为根据k/β计算出的内容向量，w_{t-1}为上一个时刻控制器产生的权值向量
+        # s: 移位权值向量，是可能移位值上的概率分布，[-1, 0, 1]
+        # γ：sharpen值常数，最后权值做归一化的时候，作为指数值
         self.read_lengths = [self.M, 1, 1, 3, 1]
+        # nn.Linear(in_features, out_features)
+        # y=wx+b, weight=Paramter(torch.Tensor(out_feature, in_feature))
+        # bias = Paramter(torch.Tensor(out_feature))
         self.fc_read = nn.Linear(controller_size, sum(self.read_lengths))
         self.reset_parameters()
 
@@ -80,6 +97,7 @@ class NTMReadHead(NTMHeadBase):
         :param w_prev: previous step state
         """
         o = self.fc_read(embeddings)
+        # 先从LSTM输出上获得相应的每一个量
         k, β, g, s, γ = _split_cols(o, self.read_lengths)
 
         # Read from memory
@@ -94,6 +112,8 @@ class NTMWriteHead(NTMHeadBase):
         super(NTMWriteHead, self).__init__(memory, controller_size)
 
         # Corresponding to k, β, g, s, γ, e, a sizes from the paper
+        # e: erase向量
+        # a: add向量
         self.write_lengths = [self.M, 1, 1, 3, 1, self.M, self.M]
         self.fc_write = nn.Linear(controller_size, sum(self.write_lengths))
         self.reset_parameters()
@@ -119,7 +139,8 @@ class NTMWriteHead(NTMHeadBase):
         k, β, g, s, γ, e, a = _split_cols(o, self.write_lengths)
 
         # e should be in [0, 1]
-        e = F.sigmoid(e)
+        e = F.sigmoid(e)  # 作用在最后一维上
+        # print(e.shape)  # torch.Size([-1, 20])
 
         # Write to memory
         w = self._address_memory(k, β, g, s, γ, w_prev)

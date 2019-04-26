@@ -10,9 +10,9 @@ class LSTMController(nn.Module):
     def __init__(self, num_inputs, num_outputs, num_layers):
         super(LSTMController, self).__init__()
 
-        self.num_inputs = num_inputs
-        self.num_outputs = num_outputs
-        self.num_layers = num_layers
+        self.num_inputs = num_inputs  # 包含各个头从矩阵中读取的信息和外部输入
+        self.num_outputs = num_outputs  # 输出为LSTM的隐藏状态
+        self.num_layers = num_layers  # LSTM的层数
 
         self.lstm = nn.LSTM(input_size=num_inputs,
                             hidden_size=num_outputs,
@@ -35,6 +35,7 @@ class LSTMController(nn.Module):
             if p.dim() == 1:
                 nn.init.constant_(p, 0)
             else:
+                # 注意这种参数初始化方式
                 stdev = 5 / (np.sqrt(self.num_inputs +  self.num_outputs))
                 nn.init.uniform_(p, -stdev, stdev)
 

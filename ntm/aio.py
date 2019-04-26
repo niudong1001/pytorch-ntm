@@ -34,9 +34,12 @@ class EncapsulatedNTM(nn.Module):
 
         # Create the NTM components
         memory = NTMMemory(N, M)
+        # 输入：包含各个头从矩阵中读取的信息和外部输入
+        # 输出：输出为LSTM的隐藏状态
         controller = LSTMController(num_inputs + M*num_heads, controller_size, controller_layers)
+        # ModuleList类似Python中的list类型，它只是将一系列层装入列表
         heads = nn.ModuleList([])
-        for i in range(num_heads):
+        for i in range(num_heads):  # 读写头个数是相等的
             heads += [
                 NTMReadHead(memory, controller_size),
                 NTMWriteHead(memory, controller_size)

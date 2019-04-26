@@ -45,6 +45,7 @@ def init_seed(seed=None):
         seed = int(get_ms() // 1000)
 
     LOGGER.info("Using seed=%d", seed)
+    # 将所有可能用到的库的seed设置成相同的值
     np.random.seed(seed)
     torch.manual_seed(seed)
     random.seed(seed)
@@ -204,16 +205,18 @@ def init_arguments():
     parser.add_argument('--seed', type=int, default=RANDOM_SEED, help="Seed value for RNGs")
     parser.add_argument('--task', action='store', choices=list(TASKS.keys()), default='copy',
                         help="Choose the task to train (default: copy)")
+    # 这里的参数会覆盖ntm网络原本的参数
     parser.add_argument('-p', '--param', action='append', default=[],
                         help='Override model params. Example: "-pbatch_size=4 -pnum_heads=2"')
     parser.add_argument('--checkpoint-interval', type=int, default=CHECKPOINT_INTERVAL,
                         help="Checkpoint interval (default: {}). "
                              "Use 0 to disable checkpointing".format(CHECKPOINT_INTERVAL))
-    parser.add_argument('--checkpoint-path', action='store', default='./',
-                        help="Path for saving checkpoint data (default: './')")
+    parser.add_argument('--checkpoint-path', action='store', default='./checkpoints',
+                        help="Path for saving checkpoint data (default: './checkpoints')")
     parser.add_argument('--report-interval', type=int, default=REPORT_INTERVAL,
                         help="Reporting interval")
 
+    # Tab自动补全参数？
     argcomplete.autocomplete(parser)
 
     args = parser.parse_args()
@@ -231,11 +234,16 @@ def update_model_params(params, update):
         if not m:
             LOGGER.error("Unable to parse param update '%s'", p)
             sys.exit(1)
-
+        # groups返回一个包含所有小组字符串的元组
         k, v = m.groups()
         update_dict[k] = v
 
     try:
+        # attr.evolve()相当于重新执行了一次init
+        # **加参数代表关键字参数，是dict类型
+        # *加参数代表无名参数，是tuple类型
+        # 在调用函数传入带'*'或'**'，会对变量解包
+        # 下面的'**'会将变量解包成多个关键字参数
         params = attr.evolve(params, **update_dict)
     except TypeError as e:
         LOGGER.error(e)
@@ -245,7 +253,7 @@ def update_model_params(params, update):
     return params
 
 def init_model(args):
-    LOGGER.info("Training for the **%s** task", args.task)
+    LOGGER.info("Training for the '%s' task", args.task)
 
     model_cls, params_cls = TASKS[args.task]
     params = params_cls()
