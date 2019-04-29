@@ -32,7 +32,8 @@ class NTMHeadBase(nn.Module):
 
         self.memory = memory # memory对象
         self.N, self.M = memory.size()
-        self.controller_size = controller_size
+        # LSTM的隐藏层大小
+        self.controller_size = controller_size 
 
     def create_new_state(self, batch_size):
         raise NotImplementedError
@@ -96,7 +97,10 @@ class NTMReadHead(NTMHeadBase):
         :param embeddings: input representation of the controller.
         :param w_prev: previous step state
         """
+        # print(embeddings.shape)  # torch.Size([1, 100])
+        # print(w_prev.shape)  # torch.Size([1, 128])
         o = self.fc_read(embeddings)
+        # print(o.shape)  # torch.Size([1, 26])
         # 先从LSTM输出上获得相应的每一个量
         k, β, g, s, γ = _split_cols(o, self.read_lengths)
 

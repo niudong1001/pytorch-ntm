@@ -34,7 +34,7 @@ class EncapsulatedNTM(nn.Module):
 
         # Create the NTM components
         memory = NTMMemory(N, M)
-        # 输入：包含各个头从矩阵中读取的信息和外部输入
+        # 输入：外部输入 + 包含各个读头的信息
         # 输出：输出为LSTM的隐藏状态
         controller = LSTMController(num_inputs + M*num_heads, controller_size, controller_layers)
         # ModuleList类似Python中的list类型，它只是将一系列层装入列表
@@ -51,7 +51,9 @@ class EncapsulatedNTM(nn.Module):
     def init_sequence(self, batch_size):
         """Initializing the state."""
         self.batch_size = batch_size
+        # 先初始化记忆矩阵的值，注意每个batch的记忆矩阵的值都会被随机初始化
         self.memory.reset(batch_size)
+        # 初始化ntm除了memory外各个部件的初始值
         self.previous_state = self.ntm.create_new_state(batch_size)
 
     def forward(self, x=None):

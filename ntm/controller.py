@@ -26,6 +26,7 @@ class LSTMController(nn.Module):
 
     def create_new_state(self, batch_size):
         # Dimension: (num_layers * num_directions, batch, hidden_size)
+        # LSTM两个内部状态的初始化值，需要注意这个初始化值是可以训练的，故每一次值都不一样
         lstm_h = self.lstm_h_bias.clone().repeat(1, batch_size, 1)
         lstm_c = self.lstm_c_bias.clone().repeat(1, batch_size, 1)
         return lstm_h, lstm_c
@@ -43,6 +44,12 @@ class LSTMController(nn.Module):
         return self.num_inputs, self.num_outputs
 
     def forward(self, x, prev_state):
-        x = x.unsqueeze(0)
+        x = x.unsqueeze(0)  # 我们这里seq长度固定为1
+        # x: input(seq_len, batch, input_size)
+        # h_i and c_i: (num_layers * num_directions, batch, hidden_size)
+        # pre_state: (h_i, c_i)
+        # LSTM Outputs: output, (h_n, c_n)
+        # output: (time_step, batch_size, hidden_size)
+        # LSTM可参考（https://blog.csdn.net/yangyang_yangqi/article/details/84585998）
         outp, state = self.lstm(x, prev_state)
         return outp.squeeze(0), state

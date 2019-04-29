@@ -55,13 +55,14 @@ class CopyTaskParams(object):
     name = attrib(default="copy-task")
     controller_size = attrib(default=100, convert=int)
     controller_layers = attrib(default=1,convert=int)
+    # 读头与写头相等
     num_heads = attrib(default=1, convert=int)
     sequence_width = attrib(default=8, convert=int)
     sequence_min_len = attrib(default=1,convert=int)
     sequence_max_len = attrib(default=20, convert=int)
     memory_n = attrib(default=128, convert=int)  # memory数目
     memory_m = attrib(default=20, convert=int)  # 单个memory维度
-    num_batches = attrib(default=50000, convert=int)
+    num_batches = attrib(default=10000, convert=int)
     batch_size = attrib(default=1, convert=int)
     rmsprop_lr = attrib(default=1e-4, convert=float)
     rmsprop_momentum = attrib(default=0.9, convert=float)

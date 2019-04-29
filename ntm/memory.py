@@ -37,17 +37,19 @@ class NTMMemory(nn.Module):
         # memory locations by content
         # pytorch将参数保存成OrderedDict，其包含两种nn.Parameter和buffer中的参数，
         # 后者不会被更新，register_buffer则是用来创建buffer参数
+        # 这个mem_bias用来控制如何初始化n*m的矩阵
         self.register_buffer('mem_bias', torch.Tensor(N, M))
 
         # Initialize memory bias
         # 为什么使用这种初始化方式？
         stdev = 1 / (np.sqrt(N + M))
+        # 记忆矩阵的值最开始是均匀分布初始化
         nn.init.uniform_(self.mem_bias, -stdev, stdev)
 
     def reset(self, batch_size):
         """Initialize memory from bias, for start-of-sequence."""
         self.batch_size = batch_size
-        # 注意记忆矩阵也存在多对
+        # 每个batch会有自己的记忆矩阵，且每次reset的值是固定的
         self.memory = self.mem_bias.clone().repeat(batch_size, 1, 1)
 
     def size(self):
@@ -59,15 +61,22 @@ class NTMMemory(nn.Module):
         # squeeze去掉某个单维
         # 参考：https://blog.csdn.net/flysky_jay/article/details/81607289
         # 下面先在w的1(N)维度上展开一维，做了乘法后再去掉第1维的结果
+        # print(w.shape)  # torch.Size([1, 128])
+        # print(self.memory.shape)  # torch.Size([1, 128, 20])
         return torch.matmul(w.unsqueeze(1), self.memory).squeeze(1)
 
     def write(self, w, e, a):
         """write to memory (according to section 3.2)."""
         self.prev_mem = self.memory
         self.memory = torch.Tensor(self.batch_size, self.N, self.M)
+        # torch.Size([1, 128]) torch.Size([1, 20]) torch.Size([1, 20])
+        # print(w.shape, e.shape, a.shape)
+        # torch.Size([1, 128, 1]) torch.Size([1, 1, 20]) torch.Size([1, 1, 20])
+        # print(w.unsqueeze(-1).shape, e.unsqueeze(1).shape, a.unsqueeze(1).shape)
+        # 记忆矩阵中每一行都会按照w的权值来拿取相应比例的值
         erase = torch.matmul(w.unsqueeze(-1), e.unsqueeze(1))
         add = torch.matmul(w.unsqueeze(-1), a.unsqueeze(1))
-        self.memory = self.prev_mem * (1 - erase) + add
+        self.memory = self.prev_mem * (1 - erase) + add 
 
     def address(self, k, β, g, s, γ, w_prev):
         """NTM Addressing (according to section 3.3).
@@ -92,8 +101,8 @@ class NTMMemory(nn.Module):
         return w
 
     def _similarity(self, k, β):
-        # print(k, k.shape)  # (-1, M)
-        # print(β, β.shape)  # (-1, 1)
+        # print(k.shape)  # (-1, M)
+        # print(β.shape)  # (-1, 1)
         k = k.view(self.batch_size, 1, -1)
         # print(self.memory.shape)  # torch.Size([1, 128, 20])
         # TODO: Maybe change to another sim function
@@ -110,10 +119,12 @@ class NTMMemory(nn.Module):
         for b in range(self.batch_size):
             # 每个batch上进行卷积操作
             result[b] = _convolve(wg[b], s[b])
+        # print(result.shape)  # torch.Size([1, 128])
         return result
 
     def _sharpen(self, ŵ, γ):
         w = ŵ ** γ
         # torch.div除法
         w = torch.div(w, torch.sum(w, dim=1).view(-1, 1) + 1e-16)
+        # print(w.shape)  # torch.Size([1, 128])
         return w

@@ -28,12 +28,6 @@ TASKS = {
 }
 
 
-# Default values for program arguments
-RANDOM_SEED = 1000
-REPORT_INTERVAL = 200
-CHECKPOINT_INTERVAL = 1000
-
-
 def get_ms():
     """Returns the current time in miliseconds."""
     return time.time() * 1000
@@ -93,6 +87,7 @@ def clip_grads(net):
 def train_batch(net, criterion, optimizer, X, Y):
     """Trains a single batch."""
     optimizer.zero_grad()
+    # print(X.shape, Y.shape)  # torch.Size([5, 1, 9]) torch.Size([4, 1, 8])
     inp_seq_len = X.size(0)
     outp_seq_len, batch_size, _ = Y.size()
 
@@ -100,12 +95,13 @@ def train_batch(net, criterion, optimizer, X, Y):
     net.init_sequence(batch_size)
 
     # Feed the sequence + delimiter
+    # 一次训练需要通过seq_len这么长个序列（真实序列+一个分隔符）
     for i in range(inp_seq_len):
         net(X[i])
 
     # Read the output (no input given)
     y_out = torch.zeros(Y.size())
-    for i in range(outp_seq_len):
+    for i in range(outp_seq_len): 
         y_out[i], _ = net()
 
     loss = criterion(y_out, Y)
@@ -174,6 +170,8 @@ def train_model(model, args):
     start_ms = get_ms()
 
     for batch_num, x, y in model.dataloader:
+        # print(x.shape, y.shape)  # torch.Size([5, 1, 9]) torch.Size([4, 1, 8])
+        # 每一列最后加1，最后加一个全0行（这一行最后一个元素为1）
         loss, cost = train_batch(model.net, model.criterion, model.optimizer, x, y)
         losses += [loss]
         costs += [cost]
@@ -198,31 +196,6 @@ def train_model(model, args):
                             batch_num, losses, costs, seq_lengths)
 
     LOGGER.info("Done training.")
-
-
-def init_arguments():
-    parser = argparse.ArgumentParser(prog='train.py')
-    parser.add_argument('--seed', type=int, default=RANDOM_SEED, help="Seed value for RNGs")
-    parser.add_argument('--task', action='store', choices=list(TASKS.keys()), default='copy',
-                        help="Choose the task to train (default: copy)")
-    # 这里的参数会覆盖ntm网络原本的参数
-    parser.add_argument('-p', '--param', action='append', default=[],
-                        help='Override model params. Example: "-pbatch_size=4 -pnum_heads=2"')
-    parser.add_argument('--checkpoint-interval', type=int, default=CHECKPOINT_INTERVAL,
-                        help="Checkpoint interval (default: {}). "
-                             "Use 0 to disable checkpointing".format(CHECKPOINT_INTERVAL))
-    parser.add_argument('--checkpoint-path', action='store', default='./checkpoints',
-                        help="Path for saving checkpoint data (default: './checkpoints')")
-    parser.add_argument('--report-interval', type=int, default=REPORT_INTERVAL,
-                        help="Reporting interval")
-
-    # Tab自动补全参数？
-    argcomplete.autocomplete(parser)
-
-    args = parser.parse_args()
-    args.checkpoint_path = args.checkpoint_path.rstrip('/')
-
-    return args
 
 
 def update_model_params(params, update):
@@ -268,6 +241,32 @@ def init_model(args):
 def init_logging():
     logging.basicConfig(format='[%(asctime)s] [%(levelname)s] [%(name)s]  %(message)s',
                         level=logging.DEBUG)
+
+
+def init_arguments():
+    parser = argparse.ArgumentParser(prog='train.py')
+    parser.add_argument('--seed', type=int,
+                        default=1000, help="Seed value for RNGs")
+    parser.add_argument('--task', action='store', choices=list(TASKS.keys()), default='copy',
+                        help="Choose the task to train (default: copy)")
+    # 这里的参数会覆盖ntm网络原本的参数
+    parser.add_argument('-p', '--param', action='append', default=[],
+                        help='Override model params. Example: "-pbatch_size=4 -pnum_heads=2"')
+    parser.add_argument('--checkpoint-interval', type=int, default=1000,
+                        help="Checkpoint interval (default: {}). "
+                             "Use 0 to disable checkpointing".format(1000))
+    parser.add_argument('--checkpoint-path', action='store', default='./checkpoints',
+                        help="Path for saving checkpoint data (default: './checkpoints')")
+    parser.add_argument('--report-interval', type=int, default=200,
+                        help="Reporting interval")
+
+    # Tab自动补全参数？
+    argcomplete.autocomplete(parser)
+
+    args = parser.parse_args()
+    args.checkpoint_path = args.checkpoint_path.rstrip('/')
+
+    return args
 
 
 def main():
